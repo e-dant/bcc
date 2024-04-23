@@ -7,11 +7,22 @@
 #include <bpf/bpf_tracing.h>
 #include "vfsstat.h"
 
+const volatile pid_t target_pid = -1;
+
 __u64 stats[S_MAXSTAT] = {};
+
+static __always_inline bool pid_match()
+{
+  u64 pid_tgid = bpf_get_current_pid_tgid();
+  u32 pid = pid_tgid;
+  return target_pid == -1 || target_pid == pid;
+}
 
 static __always_inline int inc_stats(int key)
 {
-	__atomic_add_fetch(&stats[key], 1, __ATOMIC_RELAXED);
+  if (pid_match())
+    __atomic_add_fetch(&stats[key], 1, __ATOMIC_RELAXED);
+
 	return 0;
 }
 

@@ -20,10 +20,11 @@ static const char argp_program_doc[] =
 	"EXAMPLES:\n"
 	"    vfsstat      # interval one second\n"
 	"    vfsstat 5 3  # interval five seconds, three output lines\n";
-static char args_doc[] = "[interval [count]]";
+static char args_doc[] = "[interval [count]] [-p pid]";
 
 static const struct argp_option opts[] = {
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ "pid", 'p', "PID", 0, "Trace this PID only" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -32,6 +33,7 @@ static struct env {
 	bool verbose;
 	int count;
 	int interval;
+  int pid;
 } env = {
 	.interval = 1,	/* once a second */
 };
@@ -48,6 +50,13 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'v':
 		env.verbose = true;
 		break;
+  case 'p':
+    env.pid = strtol(arg, NULL, 10);
+    if (errno || env.pid <= 0 || env.pid > INT_MAX) {
+      fprintf(stderr, "invalid pid: %s\n", arg);
+      argp_usage(state);
+    }
+    break;
 	case ARGP_KEY_ARG:
 		switch (state->arg_num) {
 		case 0:
@@ -166,6 +175,8 @@ int main(int argc, char **argv)
 		fprintf(stderr, "failed to open BPF skelect\n");
 		return 1;
 	}
+
+	skel->rodata->target_pid = env.pid;
 
 	/* It fallbacks to kprobes when kernel does not support fentry. */
 	if (fentry_can_attach("vfs_read", NULL)) {
